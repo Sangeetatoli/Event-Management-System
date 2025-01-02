@@ -1,9 +1,7 @@
-import React, { useEffect, useState, useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
+import React, { useEffect, useState } from "react";
 import "../styles/components/AccountPage.css";
 
-const AccountPage = () => {
-  const { currentUser, token } = useContext(AuthContext);
+const AccountPage = ({ memberId }) => {
   const [memberDetails, setMemberDetails] = useState({});
   const [editMode, setEditMode] = useState(false);
   const [formValues, setFormValues] = useState({});
@@ -14,18 +12,13 @@ const AccountPage = () => {
     const fetchMemberDetails = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/member/profile",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
+          `http://localhost:5000/api/members/${memberId}`
         );
         const data = await response.json();
 
         if (response.ok) {
-          setMemberDetails(data.data);
-          setFormValues(data.data);
+          setMemberDetails(data);
+          setFormValues(data);
         } else {
           setError("Failed to fetch member details.");
         }
@@ -34,10 +27,8 @@ const AccountPage = () => {
       }
     };
 
-    if (token) {
-      fetchMemberDetails();
-    }
-  }, [token]);
+    fetchMemberDetails();
+  }, [memberId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -48,20 +39,17 @@ const AccountPage = () => {
     e.preventDefault();
     try {
       const response = await fetch(
-        "http://localhost:5000/api/member/profile",
+        `http://localhost:5000/api/members/${memberId}`,
         {
           method: "PUT",
-          headers: { 
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formValues),
         }
       );
       const data = await response.json();
 
       if (response.ok) {
-        setMemberDetails(data.data);
+        setMemberDetails(data);
         setEditMode(false);
         setSuccessMessage("Details updated successfully!");
       } else {
@@ -91,6 +79,11 @@ const AccountPage = () => {
           </p>
           <p>
             <strong>Role:</strong> {memberDetails.role}
+          </p>
+          <p>
+            <strong>Joined On:</strong>{" "}
+            {memberDetails.joinDate &&
+              new Date(memberDetails.joinDate).toLocaleDateString()}
           </p>
           <button
             onClick={() => setEditMode(true)}
