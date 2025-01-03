@@ -1,83 +1,100 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 import "../styles/components/MemberDashboard.css";
 
-const MemberDashboard = ({ memberId }) => {
-  const [memberDetails, setMemberDetails] = useState({});
+const MemberDashboard = () => {
+  const { token } = useContext(AuthContext);
+  const [memberDetails, setMemberDetails] = useState(null);
   const [events, setEvents] = useState([]);
   const [newsletters, setNewsletters] = useState([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const memberResponse = await fetch(
-          `http://localhost:5000/api/members/${memberId}`
-        );
-        const memberData = await memberResponse.json();
+        // Fetch all data concurrently
+        const [memberResponse, eventsResponse, newslettersResponse] = await Promise.all([
+          fetch("http://localhost:5000/api/member/profile", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:5000/api/member/events", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:5000/api/member/newsletters", {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
 
-        const eventsResponse = await fetch("http://localhost:5000/api/events");
-        const eventsData = await eventsResponse.json();
+        // Parse all responses
+        const [memberData, eventsData, newslettersData] = await Promise.all([
+          memberResponse.json(),
+          eventsResponse.json(),
+          newslettersResponse.json()
+        ]);
 
-        const newslettersResponse = await fetch(
-          "http://localhost:5000/api/newsletters"
-        );
-        const newslettersData = await newslettersResponse.json();
+        // Check responses and update state
+        if (!memberResponse.ok) throw new Error(memberData.message);
+        if (!eventsResponse.ok) throw new Error(eventsData.message);
+        if (!newslettersResponse.ok) throw new Error(newslettersData.message);
 
-        if (memberResponse.ok) setMemberDetails(memberData);
-        else setError("Failed to fetch member details.");
-
-        if (eventsResponse.ok) setEvents(eventsData);
-        else setError("Failed to fetch events.");
-
-        if (newslettersResponse.ok) setNewsletters(newslettersData);
-        else setError("Failed to fetch newsletters.");
+        setMemberDetails(memberData.data);
+        setEvents(eventsData.data);
+        setNewsletters(newslettersData.data);
       } catch (err) {
-        setError("An error occurred while fetching data.");
+        console.error("Dashboard fetch error:", err);
+        setError("An error occurred while fetching data. Please try again later.");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchData();
-  }, [memberId]);
+  }, [token]);
+
+  if (loading) {
+    return <div className="member-dashboard__loading">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="member-dashboard__error">{error}</div>;
+  }
 
   return (
     <div className="member-dashboard">
-      <h1>Welcome, {memberDetails.name || "Member"}</h1>
-
-      {error && <p className="member-dashboard__error">{error}</p>}
+      <h1>Welcome, {memberDetails?.name || "Member"}</h1>
 
       <div className="member-dashboard__section">
         <h2>Your Account Details</h2>
-        <p>
-          <strong>Name:</strong> {memberDetails.name}
-        </p>
-        <p>
-          <strong>Email:</strong> {memberDetails.email}
-        </p>
-        <p>
-          <strong>Role:</strong> {memberDetails.role}
-        </p>
-        <p>
-          <strong>Joined On:</strong>{" "}
-          {memberDetails.joinDate &&
-            new Date(memberDetails.joinDate).toLocaleDateString()}
-        </p>
+        {memberDetails && (
+          <>
+            <p><strong>Name:</strong> {memberDetails.name}</p>
+            <p><strong>Email:</strong> {memberDetails.email}</p>
+            <p><strong>Role:</strong> {memberDetails.role}</p>
+          </>
+        )}
       </div>
 
       <div className="member-dashboard__section">
         <h2>Upcoming Events</h2>
         {events.length > 0 ? (
-          <ul>
+          <ul className="events-list">
             {events.map((event) => (
-              <li key={event.id}>
-                <strong>{event.name}</strong> - {event.date}
-                {event.requiresRegistration && (
-                  <button
-                    onClick={() => alert(`Registered for ${event.name}`)}
-                    className="member-dashboard__register-btn"
-                  >
-                    Register
-                  </button>
-                )}
+              <li key={event._id} className="event-item">
+                <h3>{event.title}</h3>
+                <p>{event.description}</p>
+                <p>
+                  <strong>Date:</strong>{" "}
+                  {new Date(event.date).toLocaleDateString()}
+                </p>
+                <p>
+                  <strong>Location:</strong> {event.location}
+                </p>
               </li>
             ))}
           </ul>
@@ -87,13 +104,16 @@ const MemberDashboard = ({ memberId }) => {
       </div>
 
       <div className="member-dashboard__section">
-        <h2>Newsletters</h2>
+        <h2>Latest Newsletters</h2>
         {newsletters.length > 0 ? (
-          <ul>
+          <ul className="newsletters-list">
             {newsletters.map((newsletter) => (
-              <li key={newsletter.id}>
-                <strong>{newsletter.title}</strong>
+              <li key={newsletter._id} className="newsletter-item">
+                <h3>{newsletter.title}</h3>
                 <p>{newsletter.content}</p>
+                <p className="newsletter-date">
+                  Published: {new Date(newsletter.date).toLocaleDateString()}
+                </p>
               </li>
             ))}
           </ul>

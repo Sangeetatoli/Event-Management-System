@@ -1,44 +1,56 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 import "../styles/components/EventsPage.css";
 
-const EventsPage = ({ memberId }) => {
+const EventsPage = () => {
+  const { token } = useContext(AuthContext); // Remove currentUser if not used
   const [events, setEvents] = useState([]);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/events");
-        const data = await response.json();
-
-        if (response.ok) {
-          setEvents(data);
-        } else {
-          setError("Failed to fetch events.");
+  const fetchEvents = async () => { // Moved inside component scope
+    try {
+      const response = await fetch("http://localhost:5000/api/member/events/registered", {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-      } catch (err) {
-        setError("An error occurred while fetching events.");
-      }
-    };
+      });
+      const data = await response.json();
 
-    fetchEvents();
-  }, []);
+      if (response.ok) {
+        setEvents(data.data);
+      } else {
+        setError("Failed to fetch events.");
+      }
+    } catch (err) {
+      setError("An error occurred while fetching events.");
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchEvents();
+    }
+  }, [token]); // Add fetchEvents to dependency array if needed
 
   const handleRegister = async (eventId) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/events/${eventId}/register`,
+        "http://localhost:5000/api/member/events/register",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memberId }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ eventId }),
         }
       );
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage(`Successfully registered for event: ${data.eventName}`);
+        setSuccessMessage("Successfully registered for the event");
+        fetchEvents(); // Now fetchEvents is in scope
       } else {
         setError(data.message || "Failed to register for the event.");
       }
@@ -49,7 +61,7 @@ const EventsPage = ({ memberId }) => {
 
   return (
     <div className="events-page">
-      <h1>Upcoming Events</h1>
+      <h1>Events</h1>
 
       {error && <p className="events-page__error">{error}</p>}
       {successMessage && (
@@ -59,8 +71,8 @@ const EventsPage = ({ memberId }) => {
       <div className="events-page__list">
         {events.length > 0 ? (
           events.map((event) => (
-            <div key={event.id} className="events-page__card">
-              <h2>{event.name}</h2>
+            <div key={event._id} className="events-page__card">
+              <h2>{event.title}</h2>
               <p>
                 <strong>Date:</strong>{" "}
                 {new Date(event.date).toLocaleDateString()}
@@ -68,18 +80,19 @@ const EventsPage = ({ memberId }) => {
               <p>
                 <strong>Description:</strong> {event.description}
               </p>
-              {event.requiresRegistration && (
-                <button
-                  onClick={() => handleRegister(event.id)}
-                  className="events-page__register-btn"
-                >
-                  Register
-                </button>
-              )}
+              <p>
+                <strong>Location:</strong> {event.location}
+              </p>
+              <button
+                onClick={() => handleRegister(event._id)}
+                className="events-page__register-btn"
+              >
+                Register
+              </button>
             </div>
           ))
         ) : (
-          <p>No upcoming events.</p>
+          <p>No events available.</p>
         )}
       </div>
     </div>

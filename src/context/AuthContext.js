@@ -1,3 +1,8 @@
+import React, { createContext, useState, useEffect } from "react";
+
+// Create and export the context
+export const AuthContext = createContext();
+
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
